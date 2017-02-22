@@ -8,27 +8,27 @@ import scala.concurrent.{ Promise, Future }
 import scala.util.control.NonFatal
 
 /** Defines how the projection offset should be persisted */
-trait OffsetPersistence { this: ProjectionActor =>
+trait OffsetPersistence[O] { this: ProjectionActor[O] =>
 
-  def saveCurrentOffset(offset: Long): Future[Unit]
+  def saveCurrentOffset(offset: O): Future[Unit]
 }
 
 /** Does NOT persist the offset forcing a full stream read each time */
-trait OffsetNotPersisted extends OffsetPersistence { this: ProjectionActor =>
+trait OffsetNotPersisted[O] extends OffsetPersistence[O] { this: ProjectionActor[O] =>
 
-  def saveCurrentOffset(offset: Long): Future[Unit] = Future.successful(())
+  def saveCurrentOffset(offset: O): Future[Unit] = Future.successful(())
 
   // nothing to recover, thus recoveryCompleted on preStart
   override def preStart(): Unit = recoveryCompleted()
 }
 
 /** Read and save from a database. */
-trait PersistedOffsetCustom extends OffsetPersistence { this: ProjectionActor =>
+trait PersistedOffsetCustom[O] extends OffsetPersistence[O] { this: ProjectionActor[O] =>
 
-  def saveCurrentOffset(offset: Long): Future[Unit]
+  def saveCurrentOffset(offset: O): Future[Unit]
 
   /** Returns the current offset as persisted in DB */
-  def readOffset: Future[Option[Long]]
+  def readOffset: Future[Option[O]]
 
   /** On preStart we read the offset from db and start the events streaming */
   override def preStart(): Unit = {
@@ -57,21 +57,21 @@ trait PersistedOffsetCustom extends OffsetPersistence { this: ProjectionActor =>
   * However, the drawback is that most (if not all) akka-persistence plugins will
   * save it as binary data which make it difficult to inspect the DB to get to know the last processed event.
   */
-trait PersistedOffsetAkka extends OffsetPersistence with PersistentActor { self: ProjectionActor =>
+trait PersistedOffsetAkka[O] extends OffsetPersistence[O] with PersistentActor { self: ProjectionActor[O] =>
 
   def persistenceId: String
 
   override def receive = receiveCommand
 
-  override def receiveCommand: Receive = acceptingEvents
+  override def receiveCommand: Receive = streaming
 
   override val receiveRecover: Receive = {
 
-    case SnapshotOffer(metadata, offset: Long) =>
+    case SnapshotOffer(metadata, offset: O) =>
       log.debug("[{}] snapshot offer - last processed event offset {}", persistenceId, offset)
       lastProcessedOffset = Some(offset)
 
-    case LastProcessedEventOffset(offset) =>
+    case LastProcessedEventOffset(offset: O) =>
       log.debug("[{}] - last processed event offset {}", persistenceId, offset)
       lastProcessedOffset = Option(offset)
 
@@ -83,10 +83,10 @@ trait PersistedOffsetAkka extends OffsetPersistence with PersistentActor { self:
 
   }
 
-  def saveCurrentOffset(offset: Long): Future[Unit] = {
+  def saveCurrentOffset(offset: O): Future[Unit] = {
 
     // we need to conform with OffsetPersistence API and return a Future[Unit]
-    // Seems odd, but thet ProjectionActor that may get this trait mixed in
+    // Seems odd, but the ProjectionActor that may get this trait mixed in
     // is not aware (and should not be aware) that this trait makes him a PersistentActor
     val saveOffsetPromise = Promise[Unit]()
 
@@ -110,5 +110,5 @@ trait PersistedOffsetAkka extends OffsetPersistence with PersistentActor { self:
 }
 
 object PersistedOffsetAkka {
-  case class LastProcessedEventOffset(offset: Long)
+  case class LastProcessedEventOffset[O](offset: O)
 }

@@ -18,6 +18,8 @@ trait AkkaBackend extends Backend[Future] {
 
   val actorSystem: ActorSystem
 
+  def sourceProvider(query: Query): EventsSourceProvider
+
   /** Parent actor for all projections! */
   lazy private val projectionMonitorActorRef = {
     val className = this.getClass.getSimpleName
@@ -33,7 +35,6 @@ trait AkkaBackend extends Backend[Future] {
 
   private val aggregates: concurrent.Map[ClassTag[_], ActorRef] = concurrent.TrieMap()
 
-  def sourceProvider(query: Query): EventsSourceProvider
 
   protected def aggregateRefById[A: ClassTag, C, E, I <: AggregateId](id: I): Ref[A, C, E] = {
     val aggregateManager =
@@ -56,7 +57,7 @@ trait AkkaBackend extends Backend[Future] {
     this
   }
 
-  def configure(config: ProjectionConfig): AkkaBackend = {
+  def configure[O](config: ProjectionConfig[O]): AkkaBackend = {
 
     val srcProvider = sourceProvider(config.query)
     // which strategy??
@@ -65,13 +66,13 @@ trait AkkaBackend extends Backend[Future] {
       config.offsetPersistenceStrategy match {
 
         case NoOffsetPersistenceStrategy =>
-          ProjectionActorWithoutOffsetPersistence.props(config.projection, srcProvider)
+          ProjectionActorWithoutOffsetPersistence.props[O](config.projection, config.publisherFactory)
 
         case BackendOffsetPersistenceStrategy(persistenceId) =>
-          ProjectionActorWithOffsetManagedByAkkaPersistence.props(config.projection, srcProvider, persistenceId)
+          ProjectionActorWithOffsetManagedByAkkaPersistence.props[O](config.projection, config.publisherFactory, persistenceId)
 
-        case strategy: CustomOffsetPersistenceStrategy =>
-          ProjectionActorWithCustomOffsetPersistence.props(config.projection, srcProvider, strategy)
+        case strategy: CustomOffsetPersistenceStrategy[O] =>
+          ProjectionActorWithCustomOffsetPersistence.props[O](config.projection, config.publisherFactory, strategy)
       }
     }
 

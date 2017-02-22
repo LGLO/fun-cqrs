@@ -67,8 +67,9 @@ class InMemoryBackend extends Backend[Identity] {
 
     // send even to projections
     def sendToProjection(event: Any) = {
+      val res = config.projection.lift[Long].onEvent(event, 0)
       // TODO: projections should be interpreted as well to avoid this
-      Await.ready(config.projection.onEvent(event), 10.seconds)
+      Await.ready(res, 10.seconds)
       ()
     }
 

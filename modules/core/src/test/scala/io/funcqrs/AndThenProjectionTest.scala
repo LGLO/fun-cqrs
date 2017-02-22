@@ -23,7 +23,7 @@ class AndThenProjectionTest extends FlatSpec with Matchers with Futures with Sca
 
     val andThenProjection = fooProjection1 andThen fooProjection2
 
-    whenReady(andThenProjection.onEvent(FooEvent("abc"))) { _ =>
+    whenReady(andThenProjection.onEvent(FooEvent("abc"), 0)) { _ =>
       fooProjection1.result.value shouldBe "abc"
       fooProjection2.result.value shouldBe "abc"
     }
@@ -36,7 +36,7 @@ class AndThenProjectionTest extends FlatSpec with Matchers with Futures with Sca
 
     val andThenProjection = fooProjection andThen barProjection
 
-    whenReady(andThenProjection.onEvent(BarEvent(10))) { _ =>
+    whenReady(andThenProjection.onEvent(BarEvent(10), 0)) { _ =>
       fooProjection.result shouldBe None
       barProjection.result.value shouldBe 10
     }
@@ -50,7 +50,7 @@ class AndThenProjectionTest extends FlatSpec with Matchers with Futures with Sca
     val andThenProjection = newFailingProjection() andThen barProjection
 
     // we must recover it in other to use with ScalaTest
-    val recovered = andThenProjection.onEvent(BarEvent(10)).recover { case _ => () }
+    val recovered = andThenProjection.onEvent(BarEvent(10), 0).recover { case _ => () }
 
     whenReady(recovered) { _ =>
       barProjection.result shouldBe None
@@ -64,25 +64,25 @@ class AndThenProjectionTest extends FlatSpec with Matchers with Futures with Sca
     val andThenProjection = barProjection andThen newFailingProjection()
 
     // we must recover it in other to use with ScalaTest
-    val recovered = andThenProjection.onEvent(BarEvent(10)).recover { case _ => () }
+    val recovered = andThenProjection.onEvent(BarEvent(10), 0).recover { case _ => () }
 
     whenReady(recovered) { _ =>
       barProjection.result.value shouldBe 10
     }
   }
 
-  def newFailingProjection() = new Projection {
+  def newFailingProjection() = new ProjectionWithOffset[Long] {
     def receiveEvent: ReceiveEvent = {
       case evt => Future.failed(new IllegalArgumentException("this projection should not receive events"))
     }
   }
 
-  trait StatefulProjection[T] extends Projection {
+  trait StatefulProjection[T] extends ProjectionWithOffset[Long] {
     var result: Option[T] = None
   }
   def newFooProjection() = new StatefulProjection[String] {
     def receiveEvent: ReceiveEvent = {
-      case evt: FooEvent =>
+      case (evt: FooEvent, _) =>
         result = Some(evt.value)
         Future.successful(())
     }
@@ -90,7 +90,7 @@ class AndThenProjectionTest extends FlatSpec with Matchers with Futures with Sca
 
   def newBarProjection() = new StatefulProjection[Int] {
     def receiveEvent: ReceiveEvent = {
-      case evt: BarEvent =>
+      case (evt: BarEvent, _) =>
         result = Some(evt.num)
         Future.successful(())
     }

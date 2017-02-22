@@ -1,42 +1,43 @@
 package io.funcqrs.config
 
-import io.funcqrs.Projection
+import io.funcqrs.projections.{ Projection, PublisherFactory }
 import io.funcqrs.backend.Query
 
 import scala.concurrent.Future
 
-case class ProjectionConfig(
+case class ProjectionConfig[O](
     query: Query,
-    projection: Projection,
+    projection: Projection[O],
     name: String,
-    offsetPersistenceStrategy: OffsetPersistenceStrategy = NoOffsetPersistenceStrategy
+    publisherFactory: PublisherFactory[O],
+    offsetPersistenceStrategy: OffsetPersistenceStrategy[O] = NoOffsetPersistenceStrategy
 ) {
 
-  def withoutOffsetPersistence(): ProjectionConfig = {
+  def withoutOffsetPersistence(): ProjectionConfig[O] = {
     copy(offsetPersistenceStrategy = NoOffsetPersistenceStrategy)
   }
 
-  def withBackendOffsetPersistence(): ProjectionConfig = {
+  def withBackendOffsetPersistence(): ProjectionConfig[O] = {
     copy(offsetPersistenceStrategy = BackendOffsetPersistenceStrategy(name))
   }
 
-  def withCustomOffsetPersistence(strategy: CustomOffsetPersistenceStrategy): ProjectionConfig = {
+  def withCustomOffsetPersistence(strategy: CustomOffsetPersistenceStrategy[O]): ProjectionConfig[O] = {
     copy(offsetPersistenceStrategy = strategy)
   }
 
 }
 
-trait OffsetPersistenceStrategy
+trait OffsetPersistenceStrategy[+O]
 
-case object NoOffsetPersistenceStrategy extends OffsetPersistenceStrategy
+case object NoOffsetPersistenceStrategy extends OffsetPersistenceStrategy[Nothing]
 
-case class BackendOffsetPersistenceStrategy(persistenceId: String) extends OffsetPersistenceStrategy
+case class BackendOffsetPersistenceStrategy[O](persistenceId: String) extends OffsetPersistenceStrategy[O]
 
-trait CustomOffsetPersistenceStrategy extends OffsetPersistenceStrategy {
+trait CustomOffsetPersistenceStrategy[O] extends OffsetPersistenceStrategy[O] {
 
-  def saveCurrentOffset(offset: Long): Future[Unit]
+  def saveCurrentOffset(offset: O): Future[Unit]
 
   /** Returns the current offset as persisted in DB */
-  def readOffset: Future[Option[Long]]
+  def readOffset: Future[Option[O]]
 
 }

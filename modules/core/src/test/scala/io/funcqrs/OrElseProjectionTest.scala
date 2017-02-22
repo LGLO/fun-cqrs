@@ -23,7 +23,7 @@ class OrElseProjectionTest extends FlatSpec with Matchers with Futures with Scal
 
     val orElseProjection = fooProjection1 orElse fooProjection2
 
-    whenReady(orElseProjection.onEvent(FooEvent("abc"))) { _ =>
+    whenReady(orElseProjection.onEvent(FooEvent("abc"), 0)) { _ =>
       fooProjection1.result.value shouldBe "abc"
       fooProjection2.result shouldBe None
     }
@@ -36,7 +36,7 @@ class OrElseProjectionTest extends FlatSpec with Matchers with Futures with Scal
 
     val orElseProjection = fooProjection orElse barProjection
 
-    whenReady(orElseProjection.onEvent(BarEvent(10))) { _ =>
+    whenReady(orElseProjection.onEvent(BarEvent(10), 0)) { _ =>
       fooProjection.result shouldBe None
       barProjection.result.value shouldBe 10
     }
@@ -50,41 +50,41 @@ class OrElseProjectionTest extends FlatSpec with Matchers with Futures with Scal
     val orElseProjection = newFailingBarProjection() orElse barProjection
 
     // we must recover it in other to use with ScalaTest
-    val recovered = orElseProjection.onEvent(BarEvent(10)).recover { case _ => () }
+    val recovered = orElseProjection.onEvent(BarEvent(10), 0).recover { case _ => () }
 
     whenReady(recovered) { _ =>
       barProjection.result shouldBe None
     }
   }
 
-  def newFailingBarProjection() = new Projection {
+  def newFailingBarProjection() = new ProjectionWithOffset[Long] {
     def receiveEvent = {
-      case evt: BarEvent => Future.failed(new IllegalArgumentException("this projection should not receive events"))
+      case (evt: BarEvent, _) => Future.failed(new IllegalArgumentException("this projection should not receive events"))
     }
   }
 
-  def newFailingFooProjection() = new Projection {
+  def newFailingFooProjection() = new ProjectionWithOffset[Long] {
     def receiveEvent = {
-      case evt: FooEvent => Future.failed(new IllegalArgumentException("this projection should not receive events"))
+      case (evt: FooEvent, _) => Future.failed(new IllegalArgumentException("this projection should not receive events"))
     }
   }
 
-  class FooProjection extends Projection {
+  class FooProjection extends ProjectionWithOffset[Long] {
     var result: Option[String] = None
 
     def receiveEvent = {
-      case evt: FooEvent =>
+      case (evt: FooEvent, _) =>
         result = Some(evt.value)
         Future.successful(())
     }
   }
   def newFooProjection() = new FooProjection
 
-  class BarProjection extends Projection {
+  class BarProjection extends ProjectionWithOffset[Long] {
     var result: Option[Int] = None
 
     def receiveEvent = {
-      case evt: BarEvent =>
+      case (evt: BarEvent, _) =>
         result = Some(evt.num)
         Future.successful(())
     }
