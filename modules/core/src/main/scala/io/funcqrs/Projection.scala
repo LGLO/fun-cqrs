@@ -7,19 +7,19 @@ import scala.util.control.NonFatal
 
 trait Projection {
 
-  type HandleEvent   = PartialFunction[Any, Future[Unit]]
+  type ReceiveEvent  = PartialFunction[Any, Future[Unit]]
   type HandleFailure = PartialFunction[(Any, Throwable), Future[Unit]]
 
   def name: String = this.getClass.getSimpleName
 
-  def handleEvent: HandleEvent
+  def receiveEvent: ReceiveEvent
 
   def onFailure: HandleFailure = PartialFunction.empty
 
   final def onEvent(evt: Any): Future[Unit] = {
-    if (handleEvent.isDefinedAt(evt)) {
+    if (receiveEvent.isDefinedAt(evt)) {
       import scala.concurrent.ExecutionContext.Implicits.global
-      handleEvent(evt).recoverWith {
+      receiveEvent(evt).recoverWith {
         case NonFatal(exp) if onFailure.isDefinedAt((evt, exp)) => onFailure(evt, exp)
       }
     } else {
@@ -50,7 +50,7 @@ object Projection {
 
   /** Projection with empty domain */
   def empty = new Projection {
-    def handleEvent: HandleEvent = PartialFunction.empty
+    def receiveEvent: ReceiveEvent = PartialFunction.empty
   }
 
   /**
@@ -88,7 +88,7 @@ object Projection {
 
     override def name: String = s"${firstProj.name}-and-then-${secondProj.name}"
 
-    def handleEvent: HandleEvent = {
+    def receiveEvent: ReceiveEvent = {
       // note that we only broadcast if at least one of the underlying
       // projections is defined for the incoming event
       // as such we make it possible to compose using orElse
@@ -115,13 +115,13 @@ object Projection {
       with Projection {
     override def name: String = s"${firstProj.name}-or-then-${secondProj.name}"
 
-    def handleEvent: HandleEvent = composedHandleEvent
+    def receiveEvent = composedHandleEvent
   }
 
   private[funcqrs] class ComposedProjection(firstProj: Projection, secondProj: Projection) {
     // compose underlying receiveEvents PartialFunction in order
     // to decide if this Projection is defined for given incoming DomainEvent
-    private[funcqrs] def composedHandleEvent = firstProj.handleEvent orElse secondProj.handleEvent
+    private[funcqrs] def composedHandleEvent = firstProj.receiveEvent orElse secondProj.receiveEvent
   }
 
 }
