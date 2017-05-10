@@ -15,9 +15,10 @@ import io.funcqrs.akka.util.ConfigReader.projectionConfig
 import io.funcqrs.config.CustomOffsetPersistenceStrategy
 import io.funcqrs.projections.{ Projection, PublisherFactory }
 
-import scala.concurrent.Future
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import scala.util.{ Failure, Success }
 
 abstract class ProjectionActor[O](
     projection: Projection[O],
@@ -26,6 +27,8 @@ abstract class ProjectionActor[O](
     with ActorLogging {
 
   implicit val timeout = Timeout(5 seconds)
+  implicit val mat     = ActorMaterializer()
+  import context.dispatcher
 
   var lastProcessedOffset: Option[O] = None
 
@@ -36,12 +39,7 @@ abstract class ProjectionActor[O](
 
   def recoveryCompleted(): Unit = {
     log.debug("ProjectionActor: starting projection... {}", projection)
-
-    implicit val mat = ActorMaterializer()
-
-    val subscriber = ActorSubscriber[EventEnvelope2](self)
-    val actorSink  = Sink.fromSubscriber(subscriber)
-
+    self ! Start
   }
 
   private def eventuallySendToParent(event: Any) = {
@@ -74,25 +72,27 @@ abstract class ProjectionActor[O](
     Source
       .fromPublisher(publisherFactory.from(lastProcessedOffset))
       .mapAsync(1) { // process the event
-        case (evt, offset) =>
+        envelope =>
           withTimeout(
-            projection.onEvent(evt, offset),
-            s"Processing offset $offset - event: $evt"
-          ).map(_ => (evt, offset))
+            projection.onEvent(envelope),
+            s"Processing offset ${envelope.offset} - event: ${envelope.event}"
+          ).map(_ => envelope)
       }
       .mapAsync(1) { // save the offset
-        case (lastEvent, offset) =>
-          log.debug("Processed {}, sending to parent {}", lastEvent, context.parent)
-          context.parent ! lastEvent // send last processed event to parent
+        envelope =>
+          log.debug("Processed {}, sending to parent {}", envelope.event, context.parent)
+          context.parent ! envelope.event // send last processed event to parent
 
           withTimeout(
-            saveCurrentOffset(offset),
-            s"Saving offset $offset - event: $lastEvent"
+            saveCurrentOffset(envelope.offset),
+            s"Saving offset ${envelope.offset} - event: ${envelope.event}"
           )
       }
       .runWith(Sink.ignore)
-      .onFailure {
-        case e => // receive an error from the stream
+      .onComplete {
+        case Success(_) =>
+          context.stop(self)
+        case Failure(e) => // receive an error from the stream
           log.error(e, "Error while processing stream for projection [{}]", projection.name)
           context.stop(self)
       }

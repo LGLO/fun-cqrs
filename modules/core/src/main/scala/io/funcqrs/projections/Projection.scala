@@ -7,8 +7,8 @@ import scala.util.control.NonFatal
 
 trait Projection[O] {
 
-  type HandleEvent   = PartialFunction[(Any, O), Future[Unit]]
-  type HandleFailure = PartialFunction[(Any, O, Throwable), Future[Unit]]
+  type HandleEvent   = PartialFunction[EventEnvelope[O], Future[Unit]]
+  type HandleFailure = PartialFunction[(EventEnvelope[O], Throwable), Future[Unit]]
 
   def name: String = this.getClass.getSimpleName
 
@@ -16,12 +16,12 @@ trait Projection[O] {
 
   def onFailure: HandleFailure = PartialFunction.empty
 
-  final def onEvent(evt: Any, offset: O): Future[Unit] = {
-    if (handleEvent.isDefinedAt(evt, offset)) {
+  final def onEvent(evt: EventEnvelope[O]): Future[Unit] = {
+    if (handleEvent.isDefinedAt(evt)) {
       import scala.concurrent.ExecutionContext.Implicits.global
-      handleEvent(evt, offset)
+      handleEvent(evt)
         .recoverWith {
-          case NonFatal(exp) if onFailure.isDefinedAt(evt, offset, exp) => onFailure(evt, offset, exp)
+          case NonFatal(exp) if onFailure.isDefinedAt(evt, exp) => onFailure(evt, exp)
         }
     } else {
       Future.successful(())
@@ -93,10 +93,10 @@ object Projection {
       // note that we only broadcast if at least one of the underlying
       // projections is defined for the incoming event
       // as such we make it possible to compose using orElse
-      case (event, offset) if composedHandleEvent.isDefinedAt(event, offset) =>
+      case (envelope) if composedHandleEvent.isDefinedAt(envelope) =>
         // send event to all projections
-        firstProj.onEvent(event, offset).flatMap { _ =>
-          secondProj.onEvent(event, offset)
+        firstProj.onEvent(envelope).flatMap { _ =>
+          secondProj.onEvent(envelope)
         }
     }
   }

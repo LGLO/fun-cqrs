@@ -39,14 +39,14 @@ object AppContext {
       aggregate(Raffle.behavior)
     }
 
-    backend.configure {
-      // projection config - read model
-      projection(
-        query      = QuerySelectAll,
-        projection = new RaffleViewProjection(raffleViewRepo),
-        name       = "RaffleViewProjection"
-      )
-    }
+//    backend.configure {
+//      // projection config - read model
+//      projection(
+//        query      = QuerySelectAll,
+//        projection = new RaffleViewProjection(raffleViewRepo),
+//        name       = "RaffleViewProjection"
+//      )
+//    }
 
     backend
   }

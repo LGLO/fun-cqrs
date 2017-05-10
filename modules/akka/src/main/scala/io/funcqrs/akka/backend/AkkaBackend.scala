@@ -18,8 +18,6 @@ trait AkkaBackend extends Backend[Future] {
 
   val actorSystem: ActorSystem
 
-  def sourceProvider(query: Query): EventsSourceProvider
-
   /** Parent actor for all projections! */
   lazy private val projectionMonitorActorRef = {
     val className = this.getClass.getSimpleName
@@ -59,7 +57,7 @@ trait AkkaBackend extends Backend[Future] {
 
   def configure[O](config: ProjectionConfig[O]): AkkaBackend = {
 
-    val srcProvider = sourceProvider(config.query)
+
     // which strategy??
     // build different ProjectionActor depending on the chosen Offset Persistence Strategy
     def projectionProps = {

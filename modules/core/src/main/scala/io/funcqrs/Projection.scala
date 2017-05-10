@@ -15,11 +15,11 @@ trait Projection { self =>
 
   def lift[O] = new io.funcqrs.projections.Projection[O] {
     override def handleEvent: HandleEvent = {
-      case (evt, _) if self.handleEvent.isDefinedAt(evt) => self.handleEvent(evt)
+      case envelop if self.handleEvent.isDefinedAt(envelop.event) => self.handleEvent(envelop.event)
     }
 
     override def onFailure: HandleFailure = {
-      case (evt, _, exp) if self.onFailure.isDefinedAt(evt, exp) => self.onFailure(evt, exp)
+      case (envelop, exp) if self.onFailure.isDefinedAt(envelop.event, exp) => self.onFailure(envelop.event, exp)
     }
   }
 

@@ -5,9 +5,12 @@ import io.funcqrs.backend.{ Backend, QueryByTag, QueryByTags, QuerySelectAll }
 import io.funcqrs.behavior._
 import io.funcqrs.config.{ AggregateConfig, ProjectionConfig }
 import io.funcqrs.interpreters.{ Identity, IdentityInterpreter }
-import rx.lang.scala.Subject
+import io.funcqrs.projections.EventEnvelope
+import org.reactivestreams.Publisher
+import rx.RxReactiveStreams
+import rx.lang.scala.{ Observable, Subject }
 import rx.lang.scala.subjects.PublishSubject
-
+import rx.lang.scala.JavaConversions._
 import scala.collection.concurrent.TrieMap
 import scala.collection.{ concurrent, immutable }
 import scala.concurrent.duration._
@@ -19,9 +22,16 @@ class InMemoryBackend extends Backend[Identity] {
   private var aggregateConfigs: concurrent.Map[ClassTag[_], AggregateConfig[_, _, _, _]] = concurrent.TrieMap()
   private var aggregates: concurrent.Map[AggregateId, IdentityAggregateRef[_, _, _]]     = TrieMap()
 
-  private val eventStream: Subject[AnyEvent] = PublishSubject()
+  private var eventsOffset: Long = 0
 
-  private val stream: Stream[AnyEvent] = Stream()
+  private val eventStream: Subject[EventEnvelope[Long]] = PublishSubject()
+
+  def eventsPublisher(): Publisher[EventEnvelope[Long]] = {
+    val obs = eventStream.asJavaObservable.asInstanceOf[rx.Observable[EventEnvelope[Long]]]
+    RxReactiveStreams.toPublisher(obs)
+  }
+
+  private val stream: Stream[EventEnvelope[Long]] = Stream()
 
   protected def aggregateRefById[A: ClassTag, C, E, I <: AggregateId](id: I): InMemoryAggregateRef[A, C, E, I] = {
 
@@ -47,44 +57,16 @@ class InMemoryBackend extends Backend[Identity] {
     this
   }
 
-  def configure(config: ProjectionConfig): Backend[Identity] = {
+  def configure[O](config: ProjectionConfig[O]): Backend[Identity] = {
 
-    // does the event match the query criteria?
-    def matchQuery(_tags: Set[Tag]): Boolean = {
-      config.query match {
-        case QueryByTag(tag)   => _tags.contains(tag)
-        case QueryByTags(tags) => tags.subsetOf(_tags)
-        case QuerySelectAll    => true
-      }
-    }
+    val rxStream = toScalaObservable(RxReactiveStreams.toObservable(config.publisherFactory.from(None)))
 
-    def matchQueryWithoutTagging(evt: Any): Boolean = {
-      config.query match {
-        case QuerySelectAll => true
-        case _              => false
-      }
-    }
-
-    // send even to projections
-    def sendToProjection(event: Any) = {
-      val res = config.projection.lift[Long].onEvent(event, 0)
+    rxStream.subscribe { envelope =>
+      // send even to projections
+      val res = config.projection.onEvent(envelope)
       // TODO: projections should be interpreted as well to avoid this
       Await.ready(res, 10.seconds)
       ()
-    }
-
-    eventStream.subscribe { event: AnyEvent =>
-      event match {
-        case evt: Tagged if matchQuery(evt.tags) =>
-          sendToProjection(event)
-
-        case evt if matchQueryWithoutTagging(evt) =>
-          sendToProjection(event)
-
-        // otherwise do nothing, don't send to projection
-        case anyEvent =>
-      }
-
     }
 
     this
@@ -92,7 +74,8 @@ class InMemoryBackend extends Backend[Identity] {
 
   private def publishEvents(evts: immutable.Seq[AnyEvent]): Unit = {
     evts foreach { evt =>
-      eventStream.onNext(evt)
+      eventsOffset = eventsOffset + 1
+      eventStream.onNext(EventEnvelope(eventsOffset, eventsOffset, evt))
     }
   }
 

@@ -1,22 +1,23 @@
 package raffle.domain.service
 
-import io.funcqrs.Projection
+import ch.qos.logback.core.boolex.EventEvaluator
+import io.funcqrs.projections.{ EventEnvelope, Projection }
 import raffle.domain.model.RaffleView.Participant
-import raffle.domain.model.{ RaffleView$, _ }
+import raffle.domain.model.{ RaffleView, _ }
 
 import scala.concurrent.Future
 
-class RaffleViewProjection(repo: RaffleViewRepo) extends Projection {
+class RaffleViewProjection(repo: RaffleViewRepo) extends Projection[Long] {
 
   def handleEvent: HandleEvent = {
 
-    case e: RaffleCreated =>
-      Future.successful(repo.save(RaffleView(id = e.lotteryId)))
+    case EventEnvelope(_, _, e: RaffleCreated) =>
+      Future.successful(repo.save(RaffleView(id = e.raffleId)))
 
-    case e: RaffleUpdateEvent =>
+    case EventEnvelope(_, _, e: RaffleUpdateEvent) =>
       Future.successful {
         repo
-          .updateById(e.lotteryId) { lot =>
+          .updateById(e.raffleId) { lot =>
             updateFunc(lot, e)
           }
           .map(_ => ())

@@ -11,22 +11,21 @@ ivyScala := ivyScala.value map {
   _.copy(overrideScalaVersion = true)
 }
 
-
 scalacOptions := Seq("-unchecked", "-deprecation", "-feature", "-Xlint:-infer-any", "-Xfatal-warnings")
 
 // dependencies
 lazy val root = Project(
-    id   = "fun-cqrs",
-    base = file("."),
-    settings = Seq(
-      publishArtifact := false
-    )
-  ) aggregate (
-    funCqrs,
-    funCqrsAkka,
-    funCqrsTestKit,
-    raffleApp
+  id   = "fun-cqrs",
+  base = file("."),
+  settings = Seq(
+    publishArtifact := false
   )
+) aggregate (
+  funCqrs,
+  funCqrsAkka,
+  funCqrsTestKit,
+  raffleApp
+)
 
 // Core ==========================================
 lazy val funCqrs = Project(
@@ -50,7 +49,7 @@ lazy val funCqrsTestKit = Project(
   id       = "fun-cqrs-test-kit",
   base     = file("modules/tests"),
   settings = defaultSettings
-).settings(libraryDependencies ++= mainDeps ++ Seq(rxScala))
+).settings(libraryDependencies ++= mainDeps ++ Seq(rxScala, reactiveStreamAdapter))
   .dependsOn(funCqrs % "compile->compile;test->test")
 //================================================
 

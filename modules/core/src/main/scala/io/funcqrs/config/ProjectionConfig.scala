@@ -6,7 +6,6 @@ import io.funcqrs.backend.Query
 import scala.concurrent.Future
 
 case class ProjectionConfig[O](
-    query: Query,
     projection: Projection[O],
     name: String,
     publisherFactory: PublisherFactory[O],

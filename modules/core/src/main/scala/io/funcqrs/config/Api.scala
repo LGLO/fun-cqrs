@@ -16,7 +16,8 @@ object Api {
       case anyOtherState =>
         Actions[A, C, E]()
           .rejectCommand {
-            case anyCommand => new CommandException(s"No actions defined for current state: $anyOtherState")
+            case anyCommand =>
+              new CommandException(s"No actions defined for ${anyCommand.getClass.getSimpleName} on current state: $anyOtherState")
           }
     }
     // enrich user defined behavior with a fallback
@@ -29,11 +30,11 @@ object Api {
   }
 
   /** Initiates the configuration of a Projection */
-  def projection[O](query: Query, projection: Projection[O], name: String, publisherFactory: PublisherFactory[O]): ProjectionConfig[O] = {
-    ProjectionConfig(query, projection, name, publisherFactory)
+  def projection[O](projection: Projection[O], name: String, publisherFactory: PublisherFactory[O]): ProjectionConfig[O] = {
+    ProjectionConfig(projection, name, publisherFactory)
   }
 
-  def projection[O](query: Query, projection: Projection[O], publisherFactory: PublisherFactory[O]): ProjectionConfig[O] = {
-    ProjectionConfig(query, projection, projection.name, publisherFactory)
+  def projection[O](projection: Projection[O], publisherFactory: PublisherFactory[O]): ProjectionConfig[O] = {
+    ProjectionConfig(projection, projection.name, publisherFactory)
   }
 }

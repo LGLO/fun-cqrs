@@ -67,11 +67,11 @@ trait PersistedOffsetAkka[O] extends OffsetPersistence[O] with PersistentActor {
 
   override val receiveRecover: Receive = {
 
-    case SnapshotOffer(metadata, offset: O) =>
+    case SnapshotOffer(metadata, offset: O @unchecked) =>
       log.debug("[{}] snapshot offer - last processed event offset {}", persistenceId, offset)
       lastProcessedOffset = Some(offset)
 
-    case LastProcessedEventOffset(offset: O) =>
+    case LastProcessedEventOffset(offset: O @unchecked) =>
       log.debug("[{}] - last processed event offset {}", persistenceId, offset)
       lastProcessedOffset = Option(offset)
 
