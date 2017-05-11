@@ -1,11 +1,12 @@
 package io.funcqrs
 
-import io.funcqrs.projections.EventEnvelope
+import io.funcqrs.projections._
 import org.scalatest.concurrent.{ Futures, ScalaFutures }
 import org.scalatest.{ FlatSpec, Matchers, OptionValues }
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.util.Failure
 
 class AndThenProjectionTest extends FlatSpec with Matchers with Futures with ScalaFutures with OptionValues {
 
@@ -79,8 +80,10 @@ class AndThenProjectionTest extends FlatSpec with Matchers with Futures with Sca
   }
 
   def newFailingProjection() = new projections.Projection[Int] {
-    def handleEvent: HandleEvent = {
-      case evt => Future.failed(new IllegalArgumentException("this projection should not receive events"))
+    def handle = {
+      attempt.HandleEvent {
+        case any => Failure(new IllegalArgumentException("this projection should not receive events"))
+      }
     }
   }
 
@@ -89,18 +92,16 @@ class AndThenProjectionTest extends FlatSpec with Matchers with Futures with Sca
   }
 
   def newFooProjection() = new StatefulProjection[String] {
-    def handleEvent: HandleEvent = {
-      case EventEnvelope(_, _, evt: FooEvent) =>
-        result = Some(evt.value)
-        Future.successful(())
-    }
+    def handle =
+      just.HandleEvent {
+        case evt: FooEvent => result = Some(evt.value)
+      }
   }
 
   def newBarProjection() = new StatefulProjection[Int] {
-    def handleEvent: HandleEvent = {
-      case EventEnvelope(_, _, evt: BarEvent) =>
-        result = Some(evt.num)
-        Future.successful(())
-    }
+    def handle =
+      just.HandleEvent {
+        case evt: BarEvent => result = Some(evt.num)
+      }
   }
 }

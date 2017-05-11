@@ -1,25 +1,27 @@
 package io.funcqrs.projections
 
+import io.funcqrs.AnyEvent
 import io.funcqrs.projections.Projection._
 
 import scala.concurrent.Future
+import scala.util.Try
 import scala.util.control.NonFatal
 
 trait Projection[O] {
 
-  type HandleEvent   = PartialFunction[EventEnvelope[O], Future[Unit]]
-  type HandleFailure = PartialFunction[(EventEnvelope[O], Throwable), Future[Unit]]
+  type Handle    = PartialFunction[EventEnvelope[O], Future[Unit]]
+  type OnFailure = PartialFunction[(EventEnvelope[O], Throwable), Future[Unit]]
 
   def name: String = this.getClass.getSimpleName
 
-  def handleEvent: HandleEvent
+  def handle: Handle
 
-  def onFailure: HandleFailure = PartialFunction.empty
+  def onFailure: OnFailure = PartialFunction.empty
 
   final def onEvent(evt: EventEnvelope[O]): Future[Unit] = {
-    if (handleEvent.isDefinedAt(evt)) {
+    if (handle.isDefinedAt(evt)) {
       import scala.concurrent.ExecutionContext.Implicits.global
-      handleEvent(evt)
+      handle(evt)
         .recoverWith {
           case NonFatal(exp) if onFailure.isDefinedAt(evt, exp) => onFailure(evt, exp)
         }
@@ -45,13 +47,78 @@ trait Projection[O] {
     * otherwise we fallback to the passed Projection.
     */
   def orElse(fallbackProjection: Projection[O]) = new OrElseProjection(this, fallbackProjection)
+
+  object just {
+
+    /** Handles an incoming Event synchronously.
+      * Other [[EventEnvelope]] fields are ignored.
+      */
+    object HandleEvent {
+      def apply(handle: PartialFunction[AnyEvent, Unit]): PartialFunction[EventEnvelope[O], Future[Unit]] = {
+        case envelop if handle.isDefinedAt(envelop.event) =>
+          Future.successful(handle(envelop.event))
+      }
+    }
+
+    /** Handles an incoming EventEnvelope synchronously.
+      */
+    object HandleEnvelope {
+      def apply(handle: PartialFunction[EventEnvelope[O], Unit]): PartialFunction[EventEnvelope[O], Future[Unit]] = {
+        case envelop if handle.isDefinedAt(envelop) =>
+          Future.successful(handle(envelop))
+      }
+    }
+
+  }
+
+  object attempt {
+
+    /** Handles an incoming Event synchronously using a [[Try]].
+      * Other [[EventEnvelope]] fields are ignored.
+      */
+    object HandleEvent {
+      def apply(handle: PartialFunction[AnyEvent, Try[Unit]]): PartialFunction[EventEnvelope[O], Future[Unit]] = {
+        case envelop if handle.isDefinedAt(envelop.event) =>
+          Future.fromTry(handle(envelop.event))
+      }
+    }
+
+    /** Handles an incoming EventEnvelope synchronously using a [[Try]].
+      */
+    object HandleEnvelope {
+      def apply(handle: PartialFunction[EventEnvelope[O], Try[Unit]]): PartialFunction[EventEnvelope[O], Future[Unit]] = {
+        case envelop if handle.isDefinedAt(envelop) =>
+          Future.fromTry(handle(envelop))
+      }
+    }
+
+  }
+
+  /** Handles an incoming Event asynchronously.
+    * Other [[EventEnvelope]] fields are ignored
+    */
+  object HandleEvent {
+    def apply(handle: PartialFunction[AnyEvent, Future[Unit]]): PartialFunction[EventEnvelope[O], Future[Unit]] = {
+      case envelop if handle.isDefinedAt(envelop.event) =>
+        handle(envelop.event)
+    }
+  }
+
+  /** Handles an incoming EventEnvelope asynchronously.
+    * This handler is defined only for API symmetry. There is no PartialFunction conversion in this case.
+    */
+  object HandleEnvelope {
+    def apply(handle: PartialFunction[EventEnvelope[O], Future[Unit]]): PartialFunction[EventEnvelope[O], Future[Unit]] =
+      handle
+  }
+
 }
 
 object Projection {
 
   /** Projection with empty domain */
   def empty[O] = new Projection[O] {
-    def handleEvent: HandleEvent = PartialFunction.empty
+    def handle: Handle = PartialFunction.empty
   }
 
   /**
@@ -89,7 +156,7 @@ object Projection {
 
     override def name: String = s"${firstProj.name}-and-then-${secondProj.name}"
 
-    def handleEvent: HandleEvent = {
+    def handle: Handle = {
       // note that we only broadcast if at least one of the underlying
       // projections is defined for the incoming event
       // as such we make it possible to compose using orElse
@@ -116,13 +183,13 @@ object Projection {
       with Projection[O] {
     override def name: String = s"${firstProj.name}-or-then-${secondProj.name}"
 
-    def handleEvent = composedHandleEvent
+    def handle = composedHandleEvent
   }
 
   private[funcqrs] class ComposedProjection[O](firstProj: Projection[O], secondProj: Projection[O]) {
     // compose underlying receiveEvents PartialFunction in order
     // to decide if this Projection is defined for given incoming DomainEvent
-    private[funcqrs] def composedHandleEvent = firstProj.handleEvent orElse secondProj.handleEvent
+    private[funcqrs] def composedHandleEvent = firstProj.handle orElse secondProj.handle
   }
 
 }

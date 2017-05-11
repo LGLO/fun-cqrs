@@ -1,12 +1,12 @@
 package raffle.domain.model
 
 import io.funcqrs.config.Api._
-import io.funcqrs.projections.{EventEnvelope, PublisherFactory}
+import io.funcqrs.projections.{ EventEnvelope, PublisherFactory }
 import io.funcqrs.test.InMemoryTestSupport
 import io.funcqrs.test.backend.InMemoryBackend
 import org.reactivestreams.Publisher
-import org.scalatest.{FunSuite, Matchers, OptionValues, TryValues}
-import raffle.domain.service.{RaffleViewProjection, RaffleViewRepo}
+import org.scalatest.{ FunSuite, Matchers, OptionValues, TryValues }
+import raffle.domain.service.{ RaffleViewProjection, RaffleViewRepo }
 
 class RaffleTest extends FunSuite with Matchers with OptionValues with TryValues {
 
@@ -27,12 +27,9 @@ class RaffleTest extends FunSuite with Matchers with OptionValues with TryValues
       // projection config - read model
       backend.configure {
         projection(
-          projection = new RaffleViewProjection(repo),
+          projection       = new RaffleViewProjection(repo),
           name             = "RaffleViewProjection",
-          publisherFactory = new PublisherFactory[Long] {
-            override def from(offset: Option[Long]): Publisher[EventEnvelope[Long]] =
-              backend.eventsPublisher()
-          }
+          publisherFactory = backend.inMemoryPublisherFactory
         )
       }
     }

@@ -1,14 +1,13 @@
 package io.funcqrs.config
 
 import io.funcqrs.projections.{ Projection, PublisherFactory }
-import io.funcqrs.backend.Query
 
 import scala.concurrent.Future
 
 case class ProjectionConfig[O](
     projection: Projection[O],
-    name: String,
     publisherFactory: PublisherFactory[O],
+    name: String,
     offsetPersistenceStrategy: OffsetPersistenceStrategy[O] = NoOffsetPersistenceStrategy
 ) {
 

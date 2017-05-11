@@ -5,7 +5,7 @@ import org.scalatest.concurrent.{ Futures, ScalaFutures }
 import org.scalatest.{ FlatSpec, Matchers, OptionValues }
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.util.Failure
 
 class OrElseProjectionTest extends FlatSpec with Matchers with Futures with ScalaFutures with OptionValues {
 
@@ -62,24 +62,22 @@ class OrElseProjectionTest extends FlatSpec with Matchers with Futures with Scal
   }
 
   def newFailingBarProjection() = new projections.Projection[Int] {
-    def handleEvent = {
-      case _ => Future.failed(new IllegalArgumentException("this projection should not receive events"))
+    def handle = attempt.HandleEvent {
+      case _ => Failure(new IllegalArgumentException("this projection should not receive events"))
     }
   }
 
   def newFailingFooProjection() = new projections.Projection[Int] {
-    def handleEvent = {
-      case _ => Future.failed(new IllegalArgumentException("this projection should not receive events"))
+    def handle = attempt.HandleEvent {
+      case _ => Failure(new IllegalArgumentException("this projection should not receive events"))
     }
   }
 
   class FooProjection extends projections.Projection[Int] {
     var result: Option[String] = None
 
-    def handleEvent: HandleEvent = {
-      case EventEnvelope(_, _, evt: FooEvent) =>
-        result = Some(evt.value)
-        Future.successful(())
+    def handle = just.HandleEvent {
+      case evt: FooEvent => result = Some(evt.value)
     }
   }
 
@@ -88,10 +86,8 @@ class OrElseProjectionTest extends FlatSpec with Matchers with Futures with Scal
   class BarProjection extends projections.Projection[Int] {
     var result: Option[Int] = None
 
-    def handleEvent: HandleEvent = {
-      case EventEnvelope(_, _, evt: BarEvent) =>
-        result = Some(evt.num)
-        Future.successful(())
+    def handle = just.HandleEvent {
+      case evt: BarEvent => result = Some(evt.num)
     }
   }
 

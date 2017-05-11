@@ -1,16 +1,16 @@
 package io.funcqrs.test
 
 import io.funcqrs.ClassTagImplicits
-import io.funcqrs.projections.{EventEnvelope, Projection, PublisherFactory}
+import io.funcqrs.projections.{ EventEnvelope, Projection, PublisherFactory }
 import io.funcqrs.config.api._
 import io.funcqrs.test.backend.InMemoryBackend
 import org.reactivestreams.Publisher
-import rx.{Observable, RxReactiveStreams}
+import rx.{ Observable, RxReactiveStreams }
 
 import scala.collection.mutable
 import scala.concurrent.Future
 import scala.reflect.ClassTag
-import scala.util.{Failure, Success, Try}
+import scala.util.{ Failure, Success, Try }
 
 trait InMemoryTestSupport {
 
@@ -19,7 +19,7 @@ trait InMemoryTestSupport {
   private lazy val receivedEvents = mutable.Queue[Any]()
 
   private lazy val internalProjection = new Projection[Long] {
-    def handleEvent: HandleEvent = {
+    def handle: Handle = {
       case envelope =>
         receivedEvents += envelope.event // add all events to queue
         Future.successful(())
@@ -34,11 +34,7 @@ trait InMemoryTestSupport {
       projection(
         projection       = internalProjection,
         name             = "InternalTestProjection",
-        publisherFactory = new PublisherFactory[Long] {
-          override def from(offset: Option[Long]): Publisher[EventEnvelope[Long]] = {
-            backend.eventsPublisher()
-          }
-        }
+        publisherFactory = backend.inMemoryPublisherFactory
       )
     }
 

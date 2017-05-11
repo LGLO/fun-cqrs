@@ -1,7 +1,6 @@
 package io.funcqrs.config
 
 import io.funcqrs.CommandException
-import io.funcqrs.backend.Query
 import io.funcqrs.behavior._
 import io.funcqrs.projections.{ Projection, PublisherFactory }
 
@@ -30,11 +29,11 @@ object Api {
   }
 
   /** Initiates the configuration of a Projection */
-  def projection[O](projection: Projection[O], name: String, publisherFactory: PublisherFactory[O]): ProjectionConfig[O] = {
-    ProjectionConfig(projection, name, publisherFactory)
+  def projection[O](projection: Projection[O], publisherFactory: PublisherFactory[O], name: String): ProjectionConfig[O] = {
+    ProjectionConfig(projection, publisherFactory, name)
   }
 
   def projection[O](projection: Projection[O], publisherFactory: PublisherFactory[O]): ProjectionConfig[O] = {
-    ProjectionConfig(projection, projection.name, publisherFactory)
+    ProjectionConfig(projection, publisherFactory, projection.name)
   }
 }

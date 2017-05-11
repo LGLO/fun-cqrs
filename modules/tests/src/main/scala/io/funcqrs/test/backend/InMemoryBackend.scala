@@ -1,16 +1,17 @@
 package io.funcqrs.test.backend
 
 import io.funcqrs._
-import io.funcqrs.backend.{ Backend, QueryByTag, QueryByTags, QuerySelectAll }
+import io.funcqrs.backend.Backend
 import io.funcqrs.behavior._
 import io.funcqrs.config.{ AggregateConfig, ProjectionConfig }
 import io.funcqrs.interpreters.{ Identity, IdentityInterpreter }
-import io.funcqrs.projections.EventEnvelope
+import io.funcqrs.projections.{ EventEnvelope, PublisherFactory }
 import org.reactivestreams.Publisher
 import rx.RxReactiveStreams
 import rx.lang.scala.{ Observable, Subject }
 import rx.lang.scala.subjects.PublishSubject
 import rx.lang.scala.JavaConversions._
+
 import scala.collection.concurrent.TrieMap
 import scala.collection.{ concurrent, immutable }
 import scala.concurrent.duration._
@@ -26,9 +27,13 @@ class InMemoryBackend extends Backend[Identity] {
 
   private val eventStream: Subject[EventEnvelope[Long]] = PublishSubject()
 
-  def eventsPublisher(): Publisher[EventEnvelope[Long]] = {
-    val obs = eventStream.asJavaObservable.asInstanceOf[rx.Observable[EventEnvelope[Long]]]
-    RxReactiveStreams.toPublisher(obs)
+  val inMemoryPublisherFactory = new PublisherFactory[Long] {
+
+    def from(offset: Option[Long]): Publisher[EventEnvelope[Long]] = {
+      val obs = eventStream.asJavaObservable.asInstanceOf[rx.Observable[EventEnvelope[Long]]]
+      RxReactiveStreams.toPublisher(obs)
+    }
+
   }
 
   private val stream: Stream[EventEnvelope[Long]] = Stream()

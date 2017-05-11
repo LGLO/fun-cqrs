@@ -69,10 +69,7 @@ object AppContext {
       .configure {
         projection(
           projection = new RaffleViewProjection(raffleViewRepo),
-          publisherFactory = new PublisherFactory[Long] {
-            override def from(offset: Option[Long]): Publisher[EventEnvelope[Long]] =
-              backend.eventsPublisher()
-          }
+          publisherFactory = backend.inMemoryPublisherFactory
         )
       }
   }
