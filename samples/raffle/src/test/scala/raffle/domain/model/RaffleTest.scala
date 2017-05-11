@@ -1,13 +1,12 @@
 package raffle.domain.model
 
-import io.funcqrs.backend.QuerySelectAll
 import io.funcqrs.config.Api._
-import io.funcqrs.projections.{ EventEnvelope, PublisherFactory }
+import io.funcqrs.projections.{EventEnvelope, PublisherFactory}
 import io.funcqrs.test.InMemoryTestSupport
 import io.funcqrs.test.backend.InMemoryBackend
 import org.reactivestreams.Publisher
-import raffle.domain.service.{ RaffleViewProjection, RaffleViewRepo }
-import org.scalatest.{ FunSuite, Matchers, OptionValues, TryValues }
+import org.scalatest.{FunSuite, Matchers, OptionValues, TryValues}
+import raffle.domain.service.{RaffleViewProjection, RaffleViewRepo}
 
 class RaffleTest extends FunSuite with Matchers with OptionValues with TryValues {
 

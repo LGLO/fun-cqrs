@@ -39,7 +39,7 @@ trait Projection[O] {
   def andThen(projection: Projection[O]) = new AndThenProjection(this, projection)
 
   /**
-    * Builds a [[OrElseProjection]]composed of this Projection and the passed Projection.
+    * Builds a [[OrElseProjection]] composed of this Projection and the passed Projection.
     *
     * If this Projection is defined for a given incoming Event, then this Projection will be applied,
     * otherwise we fallback to the passed Projection.

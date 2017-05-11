@@ -20,6 +20,12 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{ Failure, Success }
 
+object ProjectionActor {
+  case object Start
+  case class Done(evt: Any)
+  case class OffsetPersisted(offset: Long)
+}
+
 abstract class ProjectionActor[O](
     projection: Projection[O],
     publisherFactory: PublisherFactory[O]
@@ -97,14 +103,6 @@ abstract class ProjectionActor[O](
           context.stop(self)
       }
   }
-
-}
-
-object ProjectionActor {
-
-  case object Start
-  case class Done(evt: Any)
-  case class OffsetPersisted(offset: Long)
 
 }
 
